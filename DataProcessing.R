@@ -1,5 +1,8 @@
 #install.packages(c("httr","jsonlite"))
+#install.packages("tidycensus")
 
+# Accessed via get_acs() function
+#library(tidycensus)
 library(httr)
 library(jsonlite)
 library(tibble)
@@ -86,6 +89,8 @@ process_categorical_vars <- function(categorical_vars = c("SEX")) {
 }
 
 ## TODO
+
+
 ##Specify the geography level: All, Region, Division, or State (with the default of All)
 ##Check that the value specified by the user is one of the above values
 
@@ -138,31 +143,47 @@ query_census_pums <- function(
 print(url)
 
 # 6. Function for multiple years
-query_multiple_years <- function(years, numeric_vars, categorical_vars, geography_level = "All", geography_subset = NULL) {
-  # Validate years
-  lapply(years, validate_year)
-  print ("test1")
+# Function to query data for multiple years
+query_multiple_years <- function(
+    years,                       # List of years to query (e.g., c(2020, 2021))
+    numeric_vars = c("AGEP", "PWGTP"),  # List of numeric variables
+    categorical_vars = c("SEX"),        # List of categorical variables
+    geography_level = "All",            # Level of geography (e.g., "state", "All")
+    geography_subset = NULL             # Optional: Specify a region, division, or state
+) {
+  # This list will store data for each year
+  all_years_data <- list()
   
-  # Query the API for each year and combine results
-  result_list <- lapply(years, function(yr) {
-    query_census_pums(
-      year = yr,
+  # Loop through each year
+  for (year in years) {
+    # Check if the year is valid
+    validate_year(year)
+    
+    # Get data for the current year using the single-year function
+    yearly_data <- query_census_pums(
+      year = year,
       numeric_vars = numeric_vars,
       categorical_vars = categorical_vars,
       geography_level = geography_level,
       geography_subset = geography_subset
-    ) |>
-      mutate(year = yr)  # Add a year column
-  })
+    )
+    
+    # Add a 'year' column to keep track of the year in the final data
+    yearly_data$year <- year
+    
+    # Store the current year's data in the list
+    all_years_data[[as.character(year)]] <- yearly_data
+  }
   
-  print ("test2")
-  print (result_list)
+  # Combine all the yearly data into one dataset
+  final_data <- bind_rows(all_years_data)
   
-  # Combine all years into one tibble
-  final_data <- bind_rows(result_list)
-  
+  # Return the combined dataset
   return(final_data)
 }
+
+
+
 
 # Example of querying the PUMS data for the year 2022 with numeric and categorical variables
 result <- query_census_pums(
@@ -173,17 +194,18 @@ result <- query_census_pums(
   geography_subset = "10"
 )
 
-# Example of querying multiple years
-#multi_year_result <- query_multiple_years(
-#  years = c(2020, 2021, 2022),
-#  numeric_vars = c("AGEP", "PWGTP"),
-#  categorical_vars = c("SEX", "HISPEED"),
-#  geography_level = "state",
-#  geography_subset = "10"
-#)
+# Example of how to use this function to query multiple years of data
+multi_year_result <- query_multiple_years(
+  years = c(2020, 2021, 2022),    # Query data for 2020, 2021, and 2022
+  numeric_vars = c("AGEP", "PWGTP"),  # Include age and person weight in results
+  categorical_vars = c("SEX", "HISPEED"),  # Include sex and internet speed in results
+  geography_level = "state",  # Query data at the state level
+  geography_subset = "10"     # For state with code "10" (e.g., Delaware)
+)
 
 
 # View the results
 print ("end of function")
 print(result)
-#print(multi_year_result)
+# View the result
+print(multi_year_result)
