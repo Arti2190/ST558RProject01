@@ -36,6 +36,7 @@ process_api_response <- function(api_response) {
 
 # 2. Function to validate the year
 validate_year <- function(year) {
+  cat("API year is :", year)
   if (year < 2010 || year > 2022) {
     stop("Invalid year. Year must be between 2010 and 2022.")
   }
@@ -45,7 +46,7 @@ validate_year <- function(year) {
 process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
   valid_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
   
-  # Ensure PWGTP is always included
+  # Check PWGTP is always included
   if (!"PWGTP" %in% numeric_vars) {
     numeric_vars <- c(numeric_vars, "PWGTP")
   }
@@ -55,27 +56,22 @@ process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
     stop("Invalid numeric variables. Valid options: AGEP, GASP, GRPIP, JWAP, JWDP, JWMNP, PWGTP.")
   }
   
-  # Ensure at least one numeric variable other than PWGTP
+  # Check at least one numeric variable other than PWGTP
   if (!any(numeric_vars %in% valid_numeric_vars[valid_numeric_vars != "PWGTP"])) {
     stop("At least one numeric variable other than PWGTP must be returned.")
   }
   
-  # Process time variables (JWAP, JWDP) into middle time value
-  # Example: Convert JWAP (start time) and JWDP (end time) to average time (simplified)
-  time_vars <- c("JWAP", "JWDP")
-  
+  # Process time variables into middle time value
   numeric_data <- list()
   for (var in numeric_vars) {
-    if (var %in% time_vars) {
-      numeric_data[[var]] <- function(x) { mean(c(9, 17)) } 
+    if (var == "JWAP" || var == "JWDP") {
+      numeric_data[[var]] <- mean(c(9, 17))  
     } else {
-      numeric_data[[var]] <- function(x) { as.numeric(x) }
+      numeric_data[[var]] <- as.numeric(var)  
     }
   }
   return(numeric_vars)
 }
-
-# 4. Function to validate and process categorical variables
 
 process_categorical_vars <- function(categorical_vars = c("SEX")) {
   valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWAP", "JWDP", "JWTRNS", "SCH", "SCHL", "SEX")
@@ -85,11 +81,16 @@ process_categorical_vars <- function(categorical_vars = c("SEX")) {
     stop("Invalid categorical variables. Valid options: FER, HHL, HISPEED, JWAP, JWDP, JWTRNS, SCH, SCHL, SEX.")
   }
   
+  # Convert to factors
+  for (var in categorical_vars) {
+    categorical_vars[[var]] <- as.factor(var)
+  }
+  
   return(categorical_vars)
 }
 
-## TODO
 
+## TODO
 
 ##Specify the geography level: All, Region, Division, or State (with the default of All)
 ##Check that the value specified by the user is one of the above values
@@ -106,21 +107,21 @@ query_census_pums <- function(
   # Validate the year
   validate_year(year)
   
-  # Validate and process numeric variables
+  # Validate numeric variables
   numeric_vars <- process_numeric_vars(numeric_vars)
   
-  # Validate and process categorical variables
+  # Validate categorical variables
   queryparams <- process_categorical_vars(categorical_vars)
   
-  # Construct API URL (placeholder, replace with actual API endpoint)
+  # Get API URL 
   base_url <- "https://api.census.gov/data"
-  pathparam <- "acs/acs1/pums"  # Change this to the appropriate survey type if necessary
+  pathparam <- "acs/acs1/pums"  
   
-  # Construct the full URL
+  # Get the full URL
   url <- paste0(base_url, "/", year, "/", pathparam, "?get=", 
                 paste(c(numeric_vars, categorical_vars), collapse = ","),"&SCHL=24")
   
-  # If a geography subset is provided, add it to the API call
+  # Check geography subset and add it to API call
   if (!is.null(geography_subset)) {
     url <- paste0(url, "&for=", geography_level, ":", geography_subset)
   }
@@ -137,29 +138,33 @@ query_census_pums <- function(
   # Process the response into a tibble
   data <- process_api_response(api_response)
   
-  # Return the final data tibble
+  # Return the data 
   return(data)
 }
 print(url)
 
 # 6. Function for multiple years
-# Function to query data for multiple years
 query_multiple_years <- function(
-    years,                       # List of years to query (e.g., c(2020, 2021))
-    numeric_vars = c("AGEP", "PWGTP"),  # List of numeric variables
-    categorical_vars = c("SEX"),        # List of categorical variables
-    geography_level = "All",            # Level of geography (e.g., "state", "All")
-    geography_subset = NULL             # Optional: Specify a region, division, or state
+    years,                       
+    numeric_vars = c("AGEP", "PWGTP"),  
+    categorical_vars = c("SEX"),        
+    geography_level = "All",            
+    geography_subset = NULL             
 ) {
-  # This list will store data for each year
   all_years_data <- list()
   
   # Loop through each year
   for (year in years) {
     # Check if the year is valid
-    validate_year(year)
+    #validate_year(year)
+    cat("\nyear:", year)
+    # Validate the year
+    if (year < 2010 || year > 2022) {
+      print(paste("Skipping invalid year:", year))
+      next  # Skip this iteration and continue with the next year
+    }
     
-    # Get data for the current year using the single-year function
+    # Get data for the current year using the single year function
     yearly_data <- query_census_pums(
       year = year,
       numeric_vars = numeric_vars,
@@ -168,24 +173,24 @@ query_multiple_years <- function(
       geography_subset = geography_subset
     )
     
-    # Add a 'year' column to keep track of the year in the final data
+    # Add a year column 
     yearly_data$year <- year
     
-    # Store the current year's data in the list
+    # Store the current year data in the list
     all_years_data[[as.character(year)]] <- yearly_data
   }
   
-  # Combine all the yearly data into one dataset
+  # Combine all the  data into one dataset
   final_data <- bind_rows(all_years_data)
   
-  # Return the combined dataset
+  # Return dataset
   return(final_data)
 }
 
 
 
 
-# Example of querying the PUMS data for the year 2022 with numeric and categorical variables
+# Example for the single year 2022 with numeric and categorical variables
 result <- query_census_pums(
   year = 2021,
   numeric_vars = c("AGEP", "PWGTP"),
@@ -194,18 +199,106 @@ result <- query_census_pums(
   geography_subset = "10"
 )
 
-# Example of how to use this function to query multiple years of data
-multi_year_result <- query_multiple_years(
-  years = c(2020, 2021, 2022),    # Query data for 2020, 2021, and 2022
-  numeric_vars = c("AGEP", "PWGTP"),  # Include age and person weight in results
-  categorical_vars = c("SEX", "HISPEED"),  # Include sex and internet speed in results
-  geography_level = "state",  # Query data at the state level
-  geography_subset = "10"     # For state with code "10" (e.g., Delaware)
-)
-
-
 # View the results
 print ("end of function")
 print(result)
+
+# Example of multiple years of data
+multi_year_result <- query_multiple_years(
+  years = c( 2016, 2017, 2018, 2024),    
+  numeric_vars = c("AGEP", "PWGTP"),  
+  categorical_vars = c("SEX", "HISPEED"),  
+  geography_level = "state",  
+  geography_subset = "10"     
+)
+
+
+
 # View the result
 print(multi_year_result)
+
+#Run these in your console
+# After processing your tibble
+class(multi_year_result) <- c("census", class(multi_year_result))
+
+
+# Define custom summary function for the 'census' class
+summary.census <- function(census_data, 
+                           numeric_vars = NULL, 
+                           categorical_vars = NULL) {
+  
+  # Ensure PWGTP exists and is numeric
+  if (!"PWGTP" %in% names(census_data)) {
+    stop("Weight variable 'PWGTP' is missing from the dataset.")
+  }
+  
+  # Separate numeric and categorical columns from the data
+  if (is.null(numeric_vars)) {
+    numeric_vars <- names(census_data)[sapply(census_data, is.numeric) & names(census_data) != "PWGTP"]
+  }
+  
+  if (is.null(categorical_vars)) {
+    categorical_vars <- names(census_data)[sapply(census_data, is.factor)]
+  }
+  
+  # Weighted mean and standard deviation calculations
+  summarize_numeric <- function(var_name, data) {
+    numeric_vector <- as.numeric(data[[var_name]])
+    weight_vector <- as.numeric(data[["PWGTP"]])
+    
+    # Check for missing values in the weight vector
+    if (any(is.na(weight_vector))) {
+      stop("Missing values found in the weight variable 'PWGTP'.")
+    }
+    
+    # Calculate weighted mean
+    weighted_mean <- sum(numeric_vector * weight_vector, na.rm = TRUE) / sum(weight_vector, na.rm = TRUE)
+    
+    # Calculate weighted standard deviation
+    weighted_var <- sum(numeric_vector^2 * weight_vector, na.rm = TRUE) / sum(weight_vector, na.rm = TRUE)
+    weighted_sd <- sqrt(weighted_var - weighted_mean^2)
+    
+    return(list(mean = weighted_mean, sd = weighted_sd))
+  }
+  
+  # Initialize a list to store the summary results
+  summary_list <- list()
+  
+  # Summarize numeric variables
+  for (var in numeric_vars) {
+    summary_list[[var]] <- summarize_numeric(var, census_data)
+  }
+  
+  # Summarize categorical variables (counts)
+  for (var in categorical_vars) {
+    summary_list[[var]] <- table(census_data[[var]], useNA = "ifany")
+  }
+  
+  return(summary_list)
+}
+
+# Example: Use the summary function on your 'result' tibble
+summary_result <- summary.census(result, numeric_vars = c("AGEP"), categorical_vars = c("SEX"))
+print(summary_result)
+
+
+
+plot.census <- function(tibble, cat_var, num_var) {
+  # Ensure ggplot2 is loaded
+  library(ggplot2)
+  
+  # Create the weighted boxplot
+  p <- ggplot(tibble, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
+    geom_boxplot() +
+    labs(x = cat_var, y = num_var) +
+    theme_minimal()
+  
+  print(p)
+}
+
+
+
+# Plot example
+plot(census_data, cat_var = "SEX", num_var = "AGEP")
+
+
