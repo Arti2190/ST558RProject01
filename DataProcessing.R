@@ -7,6 +7,7 @@ library(httr)
 library(jsonlite)
 library(tibble)
 library(dplyr)
+library(ggplot2)
 
 
 
@@ -61,6 +62,9 @@ process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
     stop("At least one numeric variable other than PWGTP must be returned.")
   }
   
+  ##### TODO############
+  
+  
   # Process time variables into middle time value
   numeric_data <- list()
   for (var in numeric_vars) {
@@ -90,9 +94,7 @@ process_categorical_vars <- function(categorical_vars = c("SEX")) {
 }
 
 
-## TODO
 
-##Specify the geography level: All, Region, Division, or State (with the default of All)
 ##Check that the value specified by the user is one of the above values
 
 
@@ -158,7 +160,7 @@ query_multiple_years <- function(
     # Check if the year is valid
     #validate_year(year)
     cat("\nyear:", year)
-    # Validate the year
+    # Validate the year.    
     if (year < 2010 || year > 2022) {
       print(paste("Skipping invalid year:", year))
       next  # Skip this iteration and continue with the next year
@@ -282,16 +284,15 @@ summary_result <- summary.census(result, numeric_vars = c("AGEP"), categorical_v
 print(summary_result)
 
 
+########## TODO
 
-plot.census <- function(tibble, cat_var, num_var) {
-  # Ensure ggplot2 is loaded
-  library(ggplot2)
-  
+
+plot.census <- function(tibble_data, cat_var, num_var) {
   # Create the weighted boxplot
-  p <- ggplot(tibble, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
-    geom_boxplot() +
-    labs(x = cat_var, y = num_var) +
-    theme_minimal()
+  p <- ggplot(tibble_data, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
+    geom_boxplot()# +
+   # labs(x = cat_var, y = num_var) +
+    #theme_minimal()
   
   print(p)
 }
@@ -299,6 +300,6 @@ plot.census <- function(tibble, cat_var, num_var) {
 
 
 # Plot example
-plot(census_data, cat_var = "SEX", num_var = "AGEP")
+plot.census(census_data, cat_var = "SEX", num_var = "AGEP")
 
 
