@@ -3,7 +3,7 @@ title: "ST558"
 format: html
 editor: visual
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ## Public Use Microdata Sample (PUMS) Query
@@ -15,14 +15,21 @@ Preparing R packages to simplify the query process
 #install.packages("jsonlite")
 #install.packages("tidycensus")
 
+
 # Accessed via get_acs() function
 library(tidycensus)
 library(httr)
 library(jsonlite)
-library(tidyverse)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(tidyr)
+library(hms)
+library(lubridate)
+
 ```
 
-Creating helper function to assist with query process for APIs. This function will convert the raw content to character strings, parse the JSON data, and then convert the data into a tibble. 
+Creating helper function to assist with query process for APIs. This function will convert the raw content to character strings, parse the JSON data, and then convert the data into a tibble.
 
 ```{r}
 # Helper function to process API response
@@ -45,6 +52,8 @@ process_api_response <- function(api_response) {
   # Convert to tibble and set column names
   tibble_data <- as_tibble(data_rows)
   colnames(tibble_data) <- column_names
+  
+
   
   return(tibble_data)
 }
@@ -81,26 +90,84 @@ process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
   # Check at least one numeric variable other than PWGTP
   if (!any(numeric_vars %in% valid_numeric_vars[valid_numeric_vars != "PWGTP"])) {
     stop("At least one numeric variable other than PWGTP must be returned.")
-  }
+  } 
+  
+}  
 ```
 
 Creating middle time value
 
 ```{r}
-  # Process time variables into middle time value
-  numeric_data <- list()
-  for (var in numeric_vars) {
-    if (var == "JWAP" || var == "JWDP") {
-      numeric_data[[var]] <- mean(c(9, 17))  
-    } else {
-      numeric_data[[var]] <- as.numeric(var)  
-    }
-  }
-  return(numeric_vars)
-}
 
+process_JWAP_data <- function() {
+
+
+  #Converting JWAP to wide format using separate_wider_delim() 
+  JWAP_wide <- separate_wider_delim(JWAP_tibble, 
+                                    cols = c("JWAP"), 
+                                    delim = " ", 
+                                    names = c("start", "meridiem_1", "to", "end", "meridiem_2"), 
+                                    too_few = "debug", 
+                                    names_repair = "unique", 
+                                    too_many = "drop") 
+
+  #selecting the needed rows and using parse_hm to convert to usable format
+  JWAP_intervals <- JWAP_wide |>
+    select(id, start, meridiem_1, end, meridiem_2) |>
+       mutate(start = parse_hm(start),
+              end = parse_hm(end))  
+              
+
+  #Making row 1 display NA across all columns for row 1    
+  JWAP_intervals[1, ] <- NA
+
+  #Creating middle time value variable
+  JWAP_intervals <- JWAP_intervals |>
+    mutate(interval = (end - start)/2,
+           interval = as.numeric(interval),
+           interval = as.period(interval))
+
+  #Turning start into a period   
+  JWAP_intervals <- JWAP_intervals |>
+    mutate(
+      start = as.period(start),
+      middle_time = as.duration(start + interval)) |>
+        select(middle_time) 
+          
+          
+  JWAP_intervals<- JWAP_intervals |>
+    mutate(middle_time = hms::hms(seconds = middle_time))
+  
+  
+  return(JWAP_intervals)         
+}
+```
+ 
+ Saving this incase I need to reference later:
+  #get the JWAP info
+  temp <- httr::GET("https://api.census.gov/data/2022/acs/acs1/pums/variables/JWAP.json")
+  #turn it into a list
+  temp_list <- temp$content |> rawToChar() |>jsonlite::fromJSON()
+  #grab just the names of JWAP and their values
+  JWAP <- temp_list$values$item
+  #reorder just so it is clearer
+  JWAP_vals <- JWAP[sort(names(JWAP))]
+
+  JWAP_vals <- JWAP[sort(names(JWAP))]
+  
+  
+
+  #Converting JWAP_vals into a tibble
+  JWAP_tibble <- tibble(id = 1:286, JWAP = JWAP_vals)
+  
+  
+    if ("JWAP" %in% colnames(tibble_data)) {
+    tibble_data <- process_JWAP_data(tibble_data)
+  }
+
+```{r}
 process_categorical_vars <- function(categorical_vars = c("SEX")) {
-  valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWAP", "JWDP", "JWTRNS", "SCH", "SCHL", "SEX")
+  valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX")
   
   # Validate categorical variables
   if (!all(categorical_vars %in% valid_categorical_vars)) {
@@ -123,8 +190,8 @@ Main function to Query the API
 ```{r}
 # 5. Main function: Query the API
 query_census_pums <- function(
-    year = 2022, #was 2023 changed to 2022
-    numeric_vars = c("GASP", "PWGTP"),
+    year = 2022,
+    numeric_vars = c("AGEP", "PWGTP"),
     categorical_vars = c("SEX"),
     geography_level = "All",
     geography_subset = NULL
@@ -144,7 +211,7 @@ query_census_pums <- function(
   
   # Get the full URL
   url <- paste0(base_url, "/", year, "/", pathparam, "?get=", 
-                paste(c(numeric_vars, categorical_vars), collapse = ","),"&SCHL=24")
+                paste(c(numeric_vars, categorical_vars), collapse = ",")) #was there a reason to have school = 24 here?
   
   # Check geography subset and add it to API call
   if (!is.null(geography_subset)) {
@@ -167,6 +234,24 @@ query_census_pums <- function(
   return(data)
 }
 print(url)
+```
+
+Testing Query with single year
+
+```{r}
+# Example for the single year 2022 with numeric and categorical variables
+result <- query_census_pums(
+  year = 2022, 
+  numeric_vars = c("AGEP", "PWGTP", "GASP"),
+  categorical_vars = c("SEX", "HISPEED"),
+  geography_level = "state",
+  geography_subset = "10"
+)
+
+# View the results
+print ("end of function")
+print(result)
+
 ```
 
 Function for multiple years
@@ -219,11 +304,15 @@ query_multiple_years <- function(
 
 Testing the year 2022 to ensure query is working correctly
 
+
+
+TEST
 ```{r}
+
 # Example for the single year 2022 with numeric and categorical variables
 result <- query_census_pums(
-  year = 2021,
-  numeric_vars = c("AGEP", "PWGTP"),
+  year = 2022, 
+  numeric_vars = c("JWAP", "GASP"),
   categorical_vars = c("SEX", "HISPEED"),
   geography_level = "state",
   geography_subset = "10"
@@ -232,7 +321,11 @@ result <- query_census_pums(
 # View the results
 print ("end of function")
 print(result)
+```
 
+
+
+```{r}
 # Example of multiple years of data
 multi_year_result <- query_multiple_years(
   years = c( 2016, 2017, 2018, 2024),    
@@ -247,6 +340,8 @@ multi_year_result <- query_multiple_years(
 # View the result
 print(multi_year_result)
 ```
+
+
 
 Tibble processing
 
@@ -338,10 +433,3 @@ plot.census <- function(tibble_data, cat_var, num_var) {
 # Plot example
 plot.census(census_data, cat_var = "SEX", num_var = "AGEP")
 ```
-
-
-
-
-
-
-
