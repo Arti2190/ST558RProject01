@@ -53,10 +53,47 @@ process_api_response <- function(api_response) {
   tibble_data <- as_tibble(data_rows)
   colnames(tibble_data) <- column_names
   
-
+  # creating new variable in order to check if variables are numeric
+  valid_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+   
+  # Created loop to convert proper numeric variables to numeric
+  for(var in colnames(tibble_data)){
+    if(var %in% valid_numeric_vars){
+      tibble_data[[var]] <- as.numeric(tibble_data[[var]])
+    }
+  }
+  
+  # New variable to check for categorical variables
+  valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX")
+  
+  # Created loop to convert proper categorical variables to factor
+   for(var in colnames(tibble_data)){
+    if(var %in% valid_categorical_vars){
+      tibble_data[[var]] <- as.factor(tibble_data[[var]])
+    }
+  }
+  
+  #Pasting correct time values in for JWAP
+  if("JWAP" %in% colnames(tibble_data)) {
+  tibble_data <- tibble_data |>
+   left_join(JWAP_intervals, join_by(JWAP)) |>
+    rename(work_arrival_time = middle_time,
+           arrival_meridiem = meridiem) |>
+    select(-JWAP)
+  } 
+  
+  #Pasting correct time values in for JWDP
+   if("JWDP" %in% colnames(tibble_data)) {
+  tibble_data <- tibble_data |>
+   left_join(JWDP_intervals, join_by(JWDP)) |>
+    rename(work_departure_time = middle_time2,
+           departure_meridiem = meridiem2) |>
+    select(-JWDP)
+  } 
   
   return(tibble_data)
 }
+
 ```
 
 Creating a year validation function in order to confirm the only correct years (2022 to 2010) are queried.
@@ -73,7 +110,9 @@ validate_year <- function(year) {
 
 Creating a function to validate and process the numeric variables
 
+
 ```{r}
+# 3. Function to validate and process numeric variables
 process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
   valid_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
   
@@ -91,80 +130,86 @@ process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
   if (!any(numeric_vars %in% valid_numeric_vars[valid_numeric_vars != "PWGTP"])) {
     stop("At least one numeric variable other than PWGTP must be returned.")
   } 
-  
-}  
+} 
 ```
 
-Creating middle time value
+
+The next step is to analyze the JWAP and JWDP variable independently in order to grab the variables 
+
 
 ```{r}
-
-process_JWAP_data <- function() {
-
-
-  #Converting JWAP to wide format using separate_wider_delim() 
-  JWAP_wide <- separate_wider_delim(JWAP_tibble, 
-                                    cols = c("JWAP"), 
-                                    delim = " ", 
-                                    names = c("start", "meridiem_1", "to", "end", "meridiem_2"), 
-                                    too_few = "debug", 
-                                    names_repair = "unique", 
-                                    too_many = "drop") 
-
-  #selecting the needed rows and using parse_hm to convert to usable format
-  JWAP_intervals <- JWAP_wide |>
-    select(id, start, meridiem_1, end, meridiem_2) |>
-       mutate(start = parse_hm(start),
-              end = parse_hm(end))  
-              
-
-  #Making row 1 display NA across all columns for row 1    
-  JWAP_intervals[1, ] <- NA
-
-  #Creating middle time value variable
-  JWAP_intervals <- JWAP_intervals |>
-    mutate(interval = (end - start)/2,
+# Function to process time variables
+process_time_variable <- function(variable_name) {
+ 
+   # Grabbing information from API
+  temp <- httr::GET(paste0("https://api.census.gov/data/2022/acs/acs1/pums/variables/", variable_name, ".json"))
+  temp_list <- temp$content |> rawToChar() |> jsonlite::fromJSON()
+  
+  # Getting just the variable names and their values
+  time_values <- temp_list$values$item
+  time_vals_sorted <- time_values[sort(names(time_values))]
+  
+  # Converting the values into a tibble
+  time_tibble <- tibble(id = seq(0, length(time_vals_sorted) - 1), value = time_vals_sorted)
+  
+  # Converting to wide format
+  time_wide <- separate_wider_delim(time_tibble, 
+                                     cols = c("value"), 
+                                     delim = " ", 
+                                     names = c("start", "meridiem", "to", "end", "meridiem_2"), 
+                                     too_few = "debug", 
+                                     names_repair = "unique", 
+                                     too_many = "drop") 
+  
+  # Select the needed rows and convert to usable format
+  time_intervals <- time_wide |>
+    select(id, start, meridiem, end, meridiem_2) |>
+    mutate(start = parse_hm(start),
+           end = parse_hm(end),
+           variable_name = id)  
+  
+  # Make row 1 display NA across all columns for row 1    
+  time_intervals[1, ] <- NA
+  
+  # Creating middle time value variable
+  time_intervals <- time_intervals |>
+    mutate(interval = (end - start) / 2,
            interval = as.numeric(interval),
            interval = as.period(interval))
 
-  #Turning start into a period   
-  JWAP_intervals <- JWAP_intervals |>
-    mutate(
-      start = as.period(start),
-      middle_time = as.duration(start + interval)) |>
-        select(middle_time) 
+  # Turning start into a period   
+  time_intervals <- time_intervals |>
+    mutate(start = as.period(start),
+           middle_time = as.duration(start + interval)) |>
+    select(middle_time, variable_name, meridiem) 
+  
+  # Turning the first row variable back to 0
+  time_intervals[1, 2] <- 0
           
-          
-  JWAP_intervals<- JWAP_intervals |>
+  # Converting back to a time variable        
+  time_intervals <- time_intervals |>
     mutate(middle_time = hms::hms(seconds = middle_time))
   
-  
-  return(JWAP_intervals)         
-}
+  return(time_intervals)
+} 
+
+#Renaming variables to insure they work in the helper function
+JWAP_intervals <- process_time_variable("JWAP")
+JWAP_intervals <- JWAP_intervals |>
+  rename(JWAP = variable_name)
+         
+
+JWDP_intervals <- process_time_variable("JWDP")
+JWDP_intervals <- JWDP_intervals |>
+  rename(JWDP = variable_name,
+         middle_time2 = middle_time,
+         meridiem2 = meridiem)
+
 ```
  
- Saving this incase I need to reference later:
-  #get the JWAP info
-  temp <- httr::GET("https://api.census.gov/data/2022/acs/acs1/pums/variables/JWAP.json")
-  #turn it into a list
-  temp_list <- temp$content |> rawToChar() |>jsonlite::fromJSON()
-  #grab just the names of JWAP and their values
-  JWAP <- temp_list$values$item
-  #reorder just so it is clearer
-  JWAP_vals <- JWAP[sort(names(JWAP))]
-
-  JWAP_vals <- JWAP[sort(names(JWAP))]
-  
-  
-
-  #Converting JWAP_vals into a tibble
-  JWAP_tibble <- tibble(id = 1:286, JWAP = JWAP_vals)
-  
-  
-    if ("JWAP" %in% colnames(tibble_data)) {
-    tibble_data <- process_JWAP_data(tibble_data)
-  }
-
+ 
+ 
+ 
 ```{r}
 process_categorical_vars <- function(categorical_vars = c("SEX")) {
   valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX")
@@ -173,12 +218,6 @@ process_categorical_vars <- function(categorical_vars = c("SEX")) {
   if (!all(categorical_vars %in% valid_categorical_vars)) {
     stop("Invalid categorical variables. Valid options: FER, HHL, HISPEED, JWAP, JWDP, JWTRNS, SCH, SCHL, SEX.")
   }
-  
-  # Convert to factors
-  for (var in categorical_vars) {
-    categorical_vars[[var]] <- as.factor(var)
-  }
-  
   return(categorical_vars)
 }
 ```
@@ -200,10 +239,10 @@ query_census_pums <- function(
   validate_year(year)
   
   # Validate numeric variables
-  numeric_vars <- process_numeric_vars(numeric_vars)
+  process_numeric_vars(numeric_vars)
   
   # Validate categorical variables
-  queryparams <- process_categorical_vars(categorical_vars)
+  process_categorical_vars(categorical_vars)
   
   # Get API URL 
   base_url <- "https://api.census.gov/data"
@@ -242,7 +281,7 @@ Testing Query with single year
 # Example for the single year 2022 with numeric and categorical variables
 result <- query_census_pums(
   year = 2022, 
-  numeric_vars = c("AGEP", "PWGTP", "GASP"),
+  numeric_vars = c("AGEP", "PWGTP", "GASP", "JWDP", "JWAP"),
   categorical_vars = c("SEX", "HISPEED"),
   geography_level = "state",
   geography_subset = "10"
@@ -251,6 +290,7 @@ result <- query_census_pums(
 # View the results
 print ("end of function")
 print(result)
+
 
 ```
 
