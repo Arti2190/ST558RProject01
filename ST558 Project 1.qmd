@@ -53,26 +53,63 @@ process_api_response <- function(api_response) {
   tibble_data <- as_tibble(data_rows)
   colnames(tibble_data) <- column_names
   
-  # creating new variable in order to check if variables are numeric
+  #creating new variable in order to check if variables are numeric
   valid_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
    
-  # Created loop to convert proper numeric variables to numeric
+  #Created loop to convert proper numeric variables to numeric
   for(var in colnames(tibble_data)){
     if(var %in% valid_numeric_vars){
       tibble_data[[var]] <- as.numeric(tibble_data[[var]])
     }
   }
-  
-  # New variable to check for categorical variables
+  #New variable to check for categorical variables
   valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX")
   
-  # Created loop to convert proper categorical variables to factor
-   for(var in colnames(tibble_data)){
+  #Tester
+  factor_categorical_vars <- c("SEX")
+  
+  #Created loop to convert proper categorical variables to factor
+  for(var in colnames(tibble_data)){
     if(var %in% valid_categorical_vars){
       tibble_data[[var]] <- as.factor(tibble_data[[var]])
     }
   }
-  
+  #Creating levels for each categorical variable
+  if ("SEX" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+        SEX = factor(SEX, labels = SEX_levels))
+  }
+    if ("SCHL" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+        SCHL = factor(SCHL, labels = SCHL_levels))
+  }
+  if ("SCH" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+        SCH = factor(SCH, labels = SCH_levels))
+  }
+    if ("JWTRNS" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+        JWTRNS = factor(JWTRNS, labels = JWTRNS_levels))
+    }
+    if ("HISPEED" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+        HISPEED = factor(HISPEED, labels = HISPEED_levels))
+    }
+    if ("HHL" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+         HHL = factor(HHL, labels =  HHL_levels))
+    }
+    if ("FER" %in% colnames(tibble_data)) {
+    tibble_data <- tibble_data |>
+      mutate(
+         FER = factor(FER, labels = FER_levels))
+  }
   #Pasting correct time values in for JWAP
   if("JWAP" %in% colnames(tibble_data)) {
   tibble_data <- tibble_data |>
@@ -108,7 +145,7 @@ validate_year <- function(year) {
 }
 ```
 
-Creating a function to validate and process the numeric variables
+The next step we need to do is write some code to make sure the use only inputs valid numeric variables. 
 
 
 ```{r}
@@ -206,8 +243,38 @@ JWDP_intervals <- JWDP_intervals |>
          meridiem2 = meridiem)
 
 ```
+
+Function to pull levels from categorical variables
+
+```{r}
+# Function to process time variables
+process_cat_variable <- function(variable_name) {
  
- 
+   # Grabbing information from API
+  temp <- httr::GET(paste0("https://api.census.gov/data/2022/acs/acs1/pums/variables/", variable_name, ".json"))
+  temp_list <- temp$content |> rawToChar() |> jsonlite::fromJSON()
+  
+  # Getting just the variable names and their values
+  cat_values <- temp_list$values$item
+  cat_vals_sorted <- cat_values[sort(names(cat_values))]
+  
+  # Converting the values into a tibble
+  cat_tibble <- tibble(id = seq(0, length(cat_vals_sorted) - 1), value = cat_vals_sorted)
+  cat_vector <- cat_tibble$value
+  
+  return(cat_vector)
+}
+
+#Running function for categorical variables to store levels
+SCHL_levels <- process_cat_variable("SCHL")
+SEX_levels <- process_cat_variable("SEX")
+SCH_levels <- process_cat_variable("SCH")
+JWTRNS_levels <- process_cat_variable("JWTRNS")
+HISPEED_levels <- process_cat_variable("HISPEED")
+HHL_levels <- process_cat_variable("HHL")
+FER_levels <- process_cat_variable("FER")
+```
+
  
  
 ```{r}
@@ -282,7 +349,7 @@ Testing Query with single year
 result <- query_census_pums(
   year = 2022, 
   numeric_vars = c("AGEP", "PWGTP", "GASP", "JWDP", "JWAP"),
-  categorical_vars = c("SEX", "HISPEED"),
+  categorical_vars = c("SEX", "HISPEED", "FER"),
   geography_level = "state",
   geography_subset = "10"
 )
