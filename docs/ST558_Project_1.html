@@ -492,7 +492,7 @@ Attaching package: 'lubridate'</code></pre>
     .Internal(url(description, open, blocking, encoding, method, 
         headers))
 }
-&lt;bytecode: 0x000001646b0be880&gt;
+&lt;bytecode: 0x000002aaf3dcf308&gt;
 &lt;environment: namespace:base&gt;</code></pre>
 </div>
 </div>
@@ -518,18 +518,18 @@ Attaching package: 'lubridate'</code></pre>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(result)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 9,641 × 13
-    AGEP PWGTP  GASP JWMNP SEX    HISPEED    FER   SCH   state work_arrival_time
-   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;  &lt;fct&gt;      &lt;fct&gt; &lt;fct&gt; &lt;chr&gt; &lt;time&gt;           
- 1    84    76     3     0 Female N/A (GQ/v… N/A … No, … 10       NA            
- 2    39    20     3     0 Female N/A (GQ/v… No    No, … 10       NA            
- 3    19    92     3     0 Female N/A (GQ/v… No    Yes,… 10       NA            
- 4    77    19     3     0 Female N/A (GQ/v… N/A … No, … 10       NA            
- 5    18    32     3     0 Female N/A (GQ/v… No    Yes,… 10       NA            
- 6    32    80     3     0 Male   N/A (GQ/v… N/A … No, … 10       NA            
- 7    50   132     3     0 Male   N/A (GQ/v… N/A … No, … 10       NA            
- 8    23    19     3    20 Male   N/A (GQ/v… N/A … Yes,… 10    06:22            
- 9    20    47     3     0 Female N/A (GQ/v… No    Yes,… 10       NA            
-10    18   201     3     0 Female N/A (GQ/v… No    Yes,… 10       NA            
+    AGEP PWGTP  GASP JWMNP SEX    HISPEED FER      SCH   state work_arrival_time
+   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;  &lt;fct&gt;   &lt;fct&gt;    &lt;fct&gt; &lt;chr&gt; &lt;time&gt;           
+ 1    69    83    30     0 Male   Yes     N/A (le… No, … 10       NA            
+ 2    68    75    30     0 Female Yes     N/A (le… No, … 10       NA            
+ 3    57    64   290     0 Female Yes     N/A (le… No, … 10       NA            
+ 4    61    80   290    15 Male   Yes     N/A (le… No, … 10    07:47            
+ 5    50   113   110     0 Female Yes     No       Yes,… 10       NA            
+ 6    62   105   110    60 Male   Yes     N/A (le… No, … 10    09:02            
+ 7    58     9   180     0 Male   No      N/A (le… No, … 10       NA            
+ 8    61    11   180    20 Female No      N/A (le… No, … 10    09:52            
+ 9    42    12   180    35 Male   No      N/A (le… No, … 10    09:37            
+10    19    14   180    15 Female No      No       Yes,… 10    06:17            
 # ℹ 9,631 more rows
 # ℹ 3 more variables: arrival_meridiem &lt;chr&gt;, work_departure_time &lt;time&gt;,
 #   departure_meridiem &lt;chr&gt;</code></pre>
@@ -733,18 +733,18 @@ year: 2022API year is : 2022[1] "https://api.census.gov/data/2022/acs/acs1/pums?
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(rent_query)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 9,641 × 7
-    AGEP GRPIP PWGTP SEX    HHL     state  year
-   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;  &lt;fct&gt;   &lt;chr&gt; &lt;dbl&gt;
- 1    60     0    82 Female Spanish 10     2022
- 2    61     0   101 Male   Spanish 10     2022
- 3    31     0   149 Female Spanish 10     2022
- 4    28     0   106 Female Spanish 10     2022
- 5    69     0   132 Female Spanish 10     2022
- 6    30     0    76 Female Spanish 10     2022
- 7    32     0   198 Male   Spanish 10     2022
- 8    12     0   169 Male   Spanish 10     2022
- 9     3     0   564 Female Spanish 10     2022
-10     0     0   564 Female Spanish 10     2022
+    AGEP GRPIP PWGTP SEX    HHL             state  year
+   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;  &lt;fct&gt;           &lt;chr&gt; &lt;dbl&gt;
+ 1    84     0    76 Female N/A (GQ/vacant) 10     2022
+ 2    39     0    20 Female N/A (GQ/vacant) 10     2022
+ 3    19     0    92 Female N/A (GQ/vacant) 10     2022
+ 4    77     0    19 Female N/A (GQ/vacant) 10     2022
+ 5    18     0    32 Female N/A (GQ/vacant) 10     2022
+ 6    32     0    80 Male   N/A (GQ/vacant) 10     2022
+ 7    50     0   132 Male   N/A (GQ/vacant) 10     2022
+ 8    23     0    19 Male   N/A (GQ/vacant) 10     2022
+ 9    20     0    47 Female N/A (GQ/vacant) 10     2022
+10    18     0   201 Female N/A (GQ/vacant) 10     2022
 # ℹ 9,631 more rows</code></pre>
 </div>
 </div>
