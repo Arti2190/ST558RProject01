@@ -61,21 +61,10 @@ process_numeric_vars <- function(numeric_vars = c("AGEP", "PWGTP")) {
   if (!any(numeric_vars %in% valid_numeric_vars[valid_numeric_vars != "PWGTP"])) {
     stop("At least one numeric variable other than PWGTP must be returned.")
   }
-  
+} 
   ##### TODO############
   
   
-  # Process time variables into middle time value
-  numeric_data <- list()
-  for (var in numeric_vars) {
-    if (var == "JWAP" || var == "JWDP") {
-      numeric_data[[var]] <- mean(c(9, 17))  
-    } else {
-      numeric_data[[var]] <- as.numeric(var)  
-    }
-  }
-  return(numeric_vars)
-}
 
 process_categorical_vars <- function(categorical_vars = c("SEX")) {
   valid_categorical_vars <- c("FER", "HHL", "HISPEED", "JWAP", "JWDP", "JWTRNS", "SCH", "SCHL", "SEX")
